@@ -4,6 +4,8 @@
 `postgres + rag + agent + fronted(nginx)`。
 
 > 部署过程中的踩坑记录见同目录 [《部署避坑指南》](避坑指南.md)（GitHub 网络 / 国内源 / PG18 挂载点 / gojieba cgo / 多 worker 撞表 等 12 项）。
+>
+> 本仓提供三套部署脚本 + 统一分支配置，见 [「部署脚本与分支管理」](#部署脚本与分支管理)。
 
 > 三个业务仓库（agent / backend / fronted）作为同级目录被 `build:` 引用，
 > clone 时保持并列：
@@ -24,9 +26,6 @@ git clone https://github.com/Lchy2333/paper-rag-agent.git
 git clone https://github.com/Lchy2333/paper-rag-backend.git
 git clone https://github.com/Lchy2333/paper-rag-fronted.git
 git clone https://github.com/Lchy2333/paper-rag-deploy.git
-cd paper-rag-agent && git checkout dev && cd ..
-cd paper-rag-backend && git checkout dev && cd ..
-cd paper-rag-fronted && git checkout dev && cd ..
 
 # 2. 配置密钥
 cd paper-rag-deploy
@@ -34,14 +33,61 @@ cp .env.example .env            # 填 POSTGRES_PASSWORD（compose 顶层）
 mkdir -p env
 # 手动创建 env/agent.prod.env 和 env/rag.prod.env（见下面模板）
 
-# 3. 拉起
-docker compose up -d --build
+# 3. 首次拉起（脚本会自动把业务仓切到 deploy.conf 配置的分支）
+chmod +x deploy.sh pull_all.sh redeploy.sh   # 只需第一次
+./deploy.sh                                  # 拉代码 + 全量构建启动
 
 # 4. 验证
 docker compose ps                 # 4 个容器都 healthy
 curl http://localhost/health      # agent 分层健康检查
 curl http://localhost/api/health  # 前端经 Nginx
 ```
+
+## 部署脚本与分支管理
+
+**分支统一收敛到 `deploy.conf`，改一处、三个脚本全局生效：**
+
+```ini
+# deploy.conf
+BRANCH=dev              # 业务仓（agent/backend/fronted）部署分支：dev=开发 / main=正式
+DEPLOY_BRANCH=main      # 编排仓（本仓）分支，一般不用改
+```
+
+| 脚本 | 用途 | 交互 |
+|---|---|---|
+| `deploy.sh` | 拉 3 个业务仓 + 全量重建重启 | 无 |
+| `pull_all.sh` | 拉 4 个仓 + 输入数字选服务重建 | 有 |
+| `redeploy.sh` | **一键重新部署**：拉 4 个仓 + 全量重建重启 | 无 |
+
+### 日常发版（推荐）
+
+改代码推送业务仓后，服务器上一条命令完成发版：
+
+```bash
+cd ~/paper-rag-deploy && ./redeploy.sh
+```
+
+### 只重建部分服务
+
+```bash
+./pull_all.sh
+# 拉取后按提示输入空格分隔的服务编号（可多选）：
+#   1 = agent   2 = rag   3 = fronted   4 = 全部重建   0 = 跳过
+```
+
+### 切换部署分支（dev ↔ main）
+
+```bash
+# 1. 本地编辑 deploy.conf：BRANCH=main（或 dev）
+# 2. 提交并推送（本仓改动统一走 main）
+git add deploy.conf && git commit -m "chore: 部署分支切到 main" && git push origin main
+# 3. 服务器同步 + 一键部署
+cd ~/paper-rag-deploy && git pull && ./redeploy.sh
+```
+
+> ⚠️ **切分支前确认**：
+> - `main` 已通过 PR 合入最新 `dev` 代码（否则会发旧版）；
+> - 目标分支与当前数据库 schema 兼容（数据库卷共用，业务仓之间的迁移差异会影响启动）。
 
 ## 密钥模板
 
@@ -90,18 +136,19 @@ cp ~/paper-rag-backend/config/config.example.yaml ~/paper-rag-backend/config/con
 ## 常用命令
 
 ```bash
-docker compose up -d --build     # 构建 + 启动
-docker compose ps                # 状态
-docker compose logs -f agent     # 看 agent 日志
-docker compose logs -f rag       # 看 rag 日志
-docker compose down              # 停止（保留数据卷）
-docker compose down -v           # 停止并清空数据（慎用！会删数据库和上传文件）
+# —— 部署 / 发版 ——
+./redeploy.sh                       # 一键：拉 4 仓 + 全量重建重启（推荐）
+./pull_all.sh                       # 拉 4 仓 + 选服务重建
+./deploy.sh                         # 拉 3 业务仓 + 全量重建重启
 
-# 更新代码后重新部署
-git -C ../paper-rag-agent pull
-git -C ../paper-rag-backend pull
-git -C ../paper-rag-fronted pull
-docker compose up -d --build
+# —— docker compose 直接操作 ——
+docker compose up -d --build        # 构建 + 启动
+docker compose up -d --build agent  # 只重建指定服务（agent / rag / fronted）
+docker compose ps                   # 状态
+docker compose logs -f agent        # 看 agent 日志
+docker compose logs -f rag          # 看 rag 日志
+docker compose down                 # 停止（保留数据卷）
+docker compose down -v              # 停止并清空数据（慎用！会删数据库和上传文件）
 ```
 
 ## 端口与安全
