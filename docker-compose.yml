@@ -1,0 +1,69 @@
+# paper-rag 生产编排
+# 用法：docker compose up -d（需先配置 env/ 下的密钥文件，见 README）
+# 注意：build 路径引用的是同级的三个业务仓库（clone 时保持并列目录）
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: prg-postgres
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD（.env）}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 首次启动自动建表（数据卷为空时执行一次）
+      - ../paper-rag-backend/db/init.sql:/docker-entrypoint-initdb.d/10-rag.sql:ro
+      - ../paper-rag-agent/migrations/001_init.sql:/docker-entrypoint-initdb.d/20-agent-001.sql:ro
+      - ../paper-rag-agent/migrations/002_threads_pinned.sql:/docker-entrypoint-initdb.d/30-agent-002.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  rag:
+    build: ../paper-rag-backend
+    container_name: prg-rag
+    env_file: ./env/rag.prod.env
+    volumes:
+      - uploads:/app/uploads          # 上传的 PDF 持久化
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  agent:
+    build: ../paper-rag-agent
+    container_name: prg-agent
+    env_file: ./env/agent.prod.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rag:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  fronted:
+    build: ../paper-rag-fronted
+    container_name: prg-fronted
+    ports:
+      - "80:80"
+    depends_on:
+      agent:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,0 +1,10 @@
+# 部署密钥 / 环境文件，绝不提交
+.env
+.env.*
+!.env.example
+env/
+*.local
+
+# IDE
+.idea/
+.vscode/
