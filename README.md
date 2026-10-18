@@ -3,6 +3,8 @@
 论文 RAG 助手的**生产部署编排仓**。用 docker-compose 一键拉起 4 个服务：
 `postgres + rag + agent + fronted(nginx)`。
 
+> 部署过程中的踩坑记录见同目录 [《部署避坑指南》](避坑指南.md)（GitHub 网络 / 国内源 / PG18 挂载点 / gojieba cgo / 多 worker 撞表 等 12 项）。
+
 > 三个业务仓库（agent / backend / fronted）作为同级目录被 `build:` 引用，
 > clone 时保持并列：
 
