@@ -8,7 +8,8 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD（.env）}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PG18+ 镜像要求数据卷挂到 /var/lib/postgresql（含主版本号子目录，兼容 pg_ctlcluster）
+      - pgdata:/var/lib/postgresql
       # 首次启动自动建表（数据卷为空时执行一次）
       - ../paper-rag-backend/db/init.sql:/docker-entrypoint-initdb.d/10-rag.sql:ro
       - ../paper-rag-agent/migrations/001_init.sql:/docker-entrypoint-initdb.d/20-agent-001.sql:ro
