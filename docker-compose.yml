@@ -10,10 +10,11 @@ services:
     volumes:
       # PG18+ 镜像要求数据卷挂到 /var/lib/postgresql（含主版本号子目录，兼容 pg_ctlcluster）
       - pgdata:/var/lib/postgresql
-      # 首次启动自动建表（数据卷为空时执行一次）
-      - ../paper-rag-backend/db/init.sql:/docker-entrypoint-initdb.d/10-rag.sql:ro
-      - ../paper-rag-agent/migrations/001_init.sql:/docker-entrypoint-initdb.d/20-agent-001.sql:ro
-      - ../paper-rag-agent/migrations/002_threads_pinned.sql:/docker-entrypoint-initdb.d/30-agent-002.sql:ro
+      # 首次启动初始化：建库 + 建表（init.sh 建两库后分别执行 /sql/*.sql）
+      - ./init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+      - ../paper-rag-backend/db/init.sql:/sql/10-rag.sql:ro
+      - ../paper-rag-agent/migrations/001_init.sql:/sql/20-agent-001.sql:ro
+      - ../paper-rag-agent/migrations/002_threads_pinned.sql:/sql/30-agent-002.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
