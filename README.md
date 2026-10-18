@@ -61,6 +61,7 @@ JWT_EXPIRE_MINUTES=10080
 
 ```ini
 POSTGRES_PASSWORD=<密码，与 .env 的 POSTGRES_PASSWORD 一致>
+POSTGRES_HOST=postgres            # 容器内连 compose 服务名（必须）
 SILICONFLOW_API_KEY=<硅基流动 key>
 RAG_API_KEY=<与 agent 一致的 key>
 ```
