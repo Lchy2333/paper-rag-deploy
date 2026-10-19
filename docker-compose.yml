@@ -5,6 +5,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg18
     container_name: prg-postgres
+    ports:
+      - "127.0.0.1:5432:5432"   # 仅绑本机回环，供 Navicat 走 SSH 隧道连接；不对外暴露（安全组无需放行）
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD（.env）}
     volumes:
