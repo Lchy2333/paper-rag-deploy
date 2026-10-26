@@ -89,6 +89,40 @@ cd ~/paper-rag-deploy && git pull && ./redeploy.sh
 > - `main` 已通过 PR 合入最新 `dev` 代码（否则会发旧版）；
 > - 目标分支与当前数据库 schema 兼容（数据库卷共用，业务仓之间的迁移差异会影响启动）。
 
+## 数据库迁移（增量脚本）
+
+> `docker-entrypoint-initdb.d` 只在**数据卷为空**时跑一次（由 `init.sh` 依次执行 001→004）。
+> **已有生产库升级时，必须手工执行对应增量脚本**，否则新代码 INSERT 会因缺列/缺表失败。
+
+| 脚本 | 内容 | 引入功能 |
+|---|---|---|
+| `003_query_usage.sql` | 建 `query_usage` 表 | token 用量统计（会话累计事实源） |
+| `004_query_usage_last_input.sql` | 加 `last_input_tokens` 列 | 上下文水位持久化（切会话恢复环形指示器） |
+
+```bash
+# 0) 备份（建议）
+docker exec prg-postgres pg_dump -U postgres -d paper_rag_agent > backup_agent.sql
+
+# 1) 确认前置表存在（003 未执行会报 relation "query_usage" does not exist）
+docker exec prg-postgres psql -U postgres -d paper_rag_agent -c "\d query_usage"
+
+# 2) 执行增量脚本（幂等，可重复跑；lock_timeout 避免排队阻塞业务）
+docker cp ../paper-rag-agent/migrations/004_query_usage_last_input.sql prg-postgres:/tmp/004.sql
+docker exec prg-postgres psql -U postgres -d paper_rag_agent -v ON_ERROR_STOP=1 \
+  -c "SET lock_timeout='3s';" -f /tmp/004.sql
+
+# 3) 校验列已存在
+docker exec prg-postgres psql -U postgres -d paper_rag_agent -c \
+  "SELECT column_name,data_type,column_default FROM information_schema.columns \
+   WHERE table_name='query_usage' AND column_name='last_input_tokens'"
+
+# 4) 迁移成功后再发版（顺序不能反）
+./redeploy.sh
+```
+
+> `ADD COLUMN ... DEFAULT 0` 在 PG11+ 只改元数据、不重写表，`ACCESS EXCLUSIVE` 锁极短；
+> 旧代码不认识新列也不受影响，因此可以"先迁移、后发版"。
+
 ## 密钥模板
 
 ### `env/agent.prod.env`
@@ -103,6 +137,9 @@ RAG_API_KEY=<与 rag 一致的 key>
 DATABASE_URL=postgresql://postgres:<密码>@postgres:5432/paper_rag_agent
 JWT_SECRET=<随机串>
 JWT_EXPIRE_MINUTES=10080
+# 上下文窗口（可选，默认 1048576）：>0 直接使用、不联网；填 0 才回退 models.dev 目录
+# LLM_CONTEXT_WINDOW=1048576
+# LLM_PROVIDER_ID=volcengine-coding-plan
 ```
 
 ### `env/rag.prod.env`

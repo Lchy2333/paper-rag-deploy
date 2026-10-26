@@ -17,6 +17,8 @@ services:
       - ../paper-rag-backend/db/init.sql:/sql/10-rag.sql:ro
       - ../paper-rag-agent/migrations/001_init.sql:/sql/20-agent-001.sql:ro
       - ../paper-rag-agent/migrations/002_threads_pinned.sql:/sql/30-agent-002.sql:ro
+      - ../paper-rag-agent/migrations/003_query_usage.sql:/sql/40-agent-003.sql:ro
+      - ../paper-rag-agent/migrations/004_query_usage_last_input.sql:/sql/50-agent-004.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

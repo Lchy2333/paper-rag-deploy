@@ -16,5 +16,7 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "paper_rag" -f /sql
 echo "==> init paper_rag_agent (agent migrations)"
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "paper_rag_agent" -f /sql/20-agent-001.sql
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "paper_rag_agent" -f /sql/30-agent-002.sql
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "paper_rag_agent" -f /sql/40-agent-003.sql
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "paper_rag_agent" -f /sql/50-agent-004.sql
 
 echo "==> postgres init done"
