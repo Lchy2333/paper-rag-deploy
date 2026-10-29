@@ -60,6 +60,35 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # MCP Server（streamable-http 常驻服务）
+  # env/mcp.prod.env 必备项（该目录不入库，服务器上手工维护）：
+  #   MCP_TRANSPORT=streamable-http
+  #   MCP_HOST=0.0.0.0            ← 必须，容器内绑 127.0.0.1 端口映射后不可达
+  #   MCP_PORT=8765
+  #   RAG_BASE_URL=http://rag:8080
+  #   AGENT_BASE_URL=http://agent:8001
+  #   RAG_API_KEY=<与 env/rag.prod.env 的 RAG_API_KEY 相同>
+  # 禁止配置 PAPER_RAG_TOKEN：身份只来自每次请求的 Authorization 头
+  mcp:
+    build: ../paper-rag-mcp
+    container_name: prg-mcp
+    env_file: ./env/mcp.prod.env
+    ports:
+      - "8765:8765"   # 公网暴露时靠 JWT + introspect 鉴权；建议配合安全组/防火墙收敛来源
+    depends_on:
+      agent:
+        condition: service_healthy
+      rag:
+        condition: service_healthy
+    healthcheck:
+      # 镜像内无 curl，用 python 探 TCP 端口
+      test: ["CMD-SHELL", "python -c \"import socket; socket.create_connection(('127.0.0.1', 8765), 2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   fronted:
     build: ../paper-rag-fronted
     container_name: prg-fronted
