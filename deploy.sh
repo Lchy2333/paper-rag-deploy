@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh —— 一键部署/更新脚本：pull 三个业务仓（分支见 deploy.conf）+ compose 重建
+# deploy.sh —— 一键部署/更新脚本：pull 四个业务仓（分支见 deploy.conf）+ compose 重建
 set -euo pipefail
 
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,7 +9,7 @@ cd "$DEPLOY_DIR"
 . "$DEPLOY_DIR/deploy.conf"
 BRANCH="${BRANCH:-dev}"
 
-for repo in paper-rag-agent paper-rag-backend paper-rag-fronted; do
+for repo in paper-rag-agent paper-rag-backend paper-rag-fronted paper-rag-mcp; do
   if [ -d "../$repo" ]; then
     echo "==> [$repo] git pull ($BRANCH)"
     git -C "../$repo" checkout "$BRANCH"

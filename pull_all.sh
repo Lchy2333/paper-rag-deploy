@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# pull_all.sh —— 拉取 4 个仓库最新代码，并按需重新打包指定服务（发版）
+# pull_all.sh —— 拉取 5 个仓库最新代码，并按需重新打包指定服务（发版）
 #
-# 前提：四个仓并列在同一父目录（deploy 仓与 agent/backend/fronted 同级）
+# 前提：五个仓并列在同一父目录（deploy 仓与 agent/backend/fronted/mcp 同级）
 #   ~/
 #   ├── paper-rag-agent
 #   ├── paper-rag-backend
 #   ├── paper-rag-fronted
+#   ├── paper-rag-mcp
 #   └── paper-rag-deploy   ← 本脚本所在目录
 #
 # 用法：cd ~/paper-rag-deploy && ./pull_all.sh
-#   → 第 1 步：自动拉取 4 个仓（分支见 deploy.conf：业务仓 BRANCH / deploy 仓 main），并提示哪些有更新
+#   → 第 1 步：自动拉取 5 个仓（分支见 deploy.conf：业务仓 BRANCH / deploy 仓 main），并提示哪些有更新
 #   → 第 2 步：输入空格分隔的数字，选择要重建的服务（可多选）
 #       1 = agent      （paper-rag-agent）
 #       2 = rag        （paper-rag-backend）
 #       3 = fronted    （paper-rag-fronted）
-#       4 = 全部重建    （paper-rag-deploy 编排变更，或整体重新发版）
+#       4 = mcp        （paper-rag-mcp）
+#       5 = 全部重建    （paper-rag-deploy 编排变更，或整体重新发版）
 #       0 = 跳过，不重建
 #   → 对选中的服务执行：docker compose up -d --build <服务...>
 set -uo pipefail
@@ -32,6 +34,7 @@ REPOS=(
   "paper-rag-agent:$BRANCH"
   "paper-rag-backend:$BRANCH"
   "paper-rag-fronted:$BRANCH"
+  "paper-rag-mcp:$BRANCH"
   "paper-rag-deploy:$DEPLOY_BRANCH"
 )
 
@@ -40,6 +43,7 @@ declare -A REPO_SVC=(
   ["paper-rag-agent"]="agent"
   ["paper-rag-backend"]="rag"
   ["paper-rag-fronted"]="fronted"
+  ["paper-rag-mcp"]="mcp"
   ["paper-rag-deploy"]="全部"
 )
 
@@ -101,7 +105,8 @@ echo "==================== 2/2 选择要重建的服务 ===================="
 echo "  1 = agent      (paper-rag-agent)"
 echo "  2 = rag        (paper-rag-backend)"
 echo "  3 = fronted    (paper-rag-fronted)"
-echo "  4 = 全部重建    (paper-rag-deploy 编排变更，或整体重新发版)"
+echo "  4 = mcp        (paper-rag-mcp)"
+echo "  5 = 全部重建    (paper-rag-deploy 编排变更，或整体重新发版)"
 echo "  0 = 跳过，不重建"
 
 changed_hint=""
@@ -126,9 +131,10 @@ if [ -n "$choice" ]; then
       1) svc="agent" ;;
       2) svc="rag" ;;
       3) svc="fronted" ;;
-      4) rebuild_all=1 ;;
+      4) svc="mcp" ;;
+      5) rebuild_all=1 ;;
       0) skip_rebuild=1 ;;
-      *) echo "!! 无效编号：$n（只接受 0-4）"; exit 1 ;;
+      *) echo "!! 无效编号：$n（只接受 0-5）"; exit 1 ;;
     esac
     if [ "$rebuild_all" -ne 1 ] && [ "$skip_rebuild" -ne 1 ]; then
       dup=0
